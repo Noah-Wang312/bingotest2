@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>CE賓果遊戲</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+    td {
+      width: 100px;
+      height: 100px;
+      border: 1px solid black;
+      text-align: center;
+      vertical-align: middle;
+      font-size: 22px;
+      cursor: pointer;
+      background-size: cover;
+      background-position: center;
+    }
+    .correct {
+      background-size: cover;
+      color: transparent;
+    }
+    .wrong {
+      background-size: cover;
+      color: transparent;
+      cursor: not-allowed;
+    }
+
+    #winImageContainer {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 999;
+    }
+    #winImage {
+      width: 400px;
+      max-width: 80vw;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      box-shadow: 0 0 20px #000;
+    }
+    #winTimeOverlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, 35%);
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #000000;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<h1>CE賓果遊戲</h1>
+
+<table id="bingoBoard"></table>
+
+<div id="questionArea" style="margin-top: 20px; display:none;"></div>
+
+<div id="status" style="margin-top: 20px;"></div>
+
+<!-- 完成圖 + 時間 -->
+<div id="winImageContainer">
+  <img id="winImage" src="win.png" alt="完成圖">
+  <div id="winTimeOverlay">完成時間：0 秒</div>
+</div>
+
+<script>
+let allQuestions = [
+  {
+    "題號": 1,
+    "題目內容": "PRCM的小T在取證過程中，想要在PDM查找系列承認料件的承認書資訊，卻發現沒辦法在料件的相關物件中找到承認書，請問小T可以在哪個Confluence頁面中查詢到系列料件承認書的存放資訊?",
+    "A": "GPMS",
+    "B": "PDM",
+    "C": "Job Allocation",
+    "正確答案": "B"
+  },
+  {
+    "題號": 2,
+    "題目內容": "雅英在查詢料件時，發現有料件的分類屬性填錯了，若要提出變更修正應該採用什麼方式?",
+    "A": "開Itemchange Task",
+    "B": "提出變更需求Mail給CE窗口",
+    "C": "填錯就無法變更了，所以不理他",
+    "正確答案": "B"
+  },
+  {
+    "題號": 3,
+    "題目內容": "CQPM的小美, 在審查客戶合約時, 看到IEC 62402 Obsolescence Management的相關條文, 若小美想知道IRIS Obsolescence Management相關要求, 可查詢哪個頁面？",
+    "A": "PPM幫幫忙",
+    "B": "Reliability Management",
+    "C": "Obsolescence Management",
+    "正確答案": "C"
+  },
+  {
+    "題號": 4,
+    "題目內容": "CE小C在確認承認書發行後會開始送樣，請問承認樣品不會發行給哪個單位?",
+    "A": "IQC",
+    "B": "Sourcer",
+    "C": "ADM",
+    "正確答案": "C"
+  },
+  {
+    "題號": 5,
+    "題目內容": "下列何者屬於機電料件?",
+    "A": "HDMI Connector",
+    "B": "TVS",
+    "C": "Bead",
+    "正確答案": "A"
+  },
+  {
+    "題號": 6,
+    "題目內容": "小K最近在參與新機構件設計時，接觸到鋁擠型零件，他好奇為什麼設計圖上標示的鋁擠型長度可以任意切割但斷面卻完全一致。請問這種現象最主要是因為鋁擠型工藝具有什麼特性？",
+    "A": "表面可自由變化以配合模具設計",
+    "B": "擠壓模具固定，使截面形狀沿長度方向均相同",
+    "C": "每段鋁材皆須單獨CNC加工以確保形狀一致",
+    "正確答案": "B"
+  },
+  {
+    "題號": 7,
+    "題目內容": "資深工程師小L在討論機構件選材時，建議將某款設備外殼改為板金件，新人小P好奇為什麼這麼多產品會選用板金製作，小L解釋，除了可透過模具快速量產外，板金材料本身有哪些特性也促成了這項決策？",
+    "A": "質地輕薄，但易燃不耐疲勞",
+    "B": "專為3D列印設計，無法進行熔接與沖壓",
+    "C": "可塑性高，能加工成多種形狀且堅固耐用",
+    "正確答案": "C"
+  },
+  {
+    "題號": 8,
+    "題目內容": "ME RD詢問小王那些電子料區的承認書簽核，需會簽ME RD，在哪可找到文件規範?",
+    "A": "GPMS",
+    "B": "GeDCC",
+    "C": "Job Allocation",
+    "正確答案": "B"
+  },
+  {
+    "題號": 9,
+    "題目內容": "RD詢問料號申請時，哪裡可看到CE Review審查的到期日?",
+    "A": "PDM",
+    "B": "GeDCC",
+    "C": "Jira",
+    "正確答案": "A"
+  },
+  {
+    "題號": 10,
+    "題目內容": "RD 阿雷想看CE購買已發行至系統的IEC 61984，請問可以在哪個系統看到？",
+    "A": "Jira",
+    "B": "GeDCC",
+    "C": "PDM",
+    "正確答案": "B"
+  },
+  {
+    "題號": 11,
+    "題目內容": "請問替代料承認管理簡稱為何？",
+    "A": "APP",
+    "B": "PTT",
+    "C": "AAP",
+    "正確答案": "C"
+  },
+  {
+    "題號": 12,
+    "題目內容": "老K是一名RD，看到他的零件狀態在PDM上為CE Review，他想知道是哪一位CE同仁負責，請問他可以在哪裡找到？",
+    "A": "Fundamental knowledge",
+    "B": "Job Training CA&E Basic",
+    "C": "Job Allocation",
+    "正確答案": "C"
+  },
+  {
+    "題號": 13,
+    "題目內容": "小J是一位新進同仁，因工作需求需要申請GPMS的帳號，請問要如何幫助新同仁申請呢?",
+    "A": "找採購",
+    "B": "找HR",
+    "C": "找GP窗口",
+    "正確答案": "C"
+  },
+  {
+    "題號": 14,
+    "題目內容": "小A看到料號的狀態顯示Conditional Release，但不知道這狀態代表的意義為何。請問小A可以在哪裡查看料號號狀態的介紹？",
+    "A": "Commonly Used System",
+    "B": "Part Status Introduction",
+    "C": "Fundamental knowledge",
+    "正確答案": "B"
+  },
+  {
+    "題號": 15,
+    "題目內容": "供應商被採購要求要完成承認書確認回覆單任務，但供應商不知道該怎麼在系統執行這件事，因此亂槍打鳥找到你詢問。前輩跟你說可以在KM中找到回覆供應商的操作說明，因此你到了……",
+    "A": "Commonly Used System的GPMS",
+    "B": "Commonly Used System的PDM",
+    "C": "Commonly Used System的Redmine",
+    "正確答案": "A"
+  },
+  {
+    "題號": 16,
+    "題目內容": "MOXA產品外殼多為板金料，需考量耐腐蝕性。鋅塗層可作為保護屏障，降低生鏽和腐蝕的風險，下列哪項是鍍鋅鋼板材料牌號？",
+    "A": "SPCC",
+    "B": "SECC",
+    "C": "SPHC",
+    "正確答案": "B"
+  },
+  {
+    "題號": 17,
+    "題目內容": "RD小明在設計產品考量海事應用時，應該選用哪一型號的不鏽鋼(SUS)才能具備較佳抗腐蝕能力?",
+    "A": "301",
+    "B": "304",
+    "C": "316",
+    "D": "430",
+    "正確答案": "C"
+  },
+  {
+    "題號": 18,
+    "題目內容": "RD陳大哥想要設計一款鋁擠鰭片的產品，於是乎他上KM系統找尋了相關資料，請問他鰭片高度跟鰭片間距的比值落在多少比較容易加工呢?",
+    "A": "3:1",
+    "B": "5:1",
+    "C": "7:1",
+    "D": "9:1",
+    "正確答案": "A"
+  },
+  {
+    "題號": 19,
+    "題目內容": "RD小美剛加入MOXA不久，主管要他設計一款鋁擠型的產品，請問他設計的鋁擠型產品標準公差設定是哪一種呢?(MOXA內部規範)",
+    "A": "Class 1",
+    "B": "Class 2",
+    "C": "Class 3",
+    "D": "Class 8",
+    "正確答案": "B"
+  },
+  {
+    "題號": 20,
+    "題目內容": "請問壓鑄與其他鑄造技術相比，最大的優勢之一是什麼？",
+    "A": "可應用於所有金屬材料",
+    "B": "模具成本較低",
+    "C": "表面更平整、尺寸一致性更高",
+    "D": "不需要使用模具",
+    "正確答案": "C"
+  },
+  {
+    "題號": 21,
+    "題目內容": "請問壓力鑄造最不適合用於製作下列哪一類產品？",
+    "A": "車用引擎蓋殼體",
+    "B": "電子產品外殼",
+    "C": "飛機結構支架",
+    "D": "家用水龍頭零件",
+    "正確答案": "C"
+  },
+  {
+    "題號": 22,
+    "題目內容": "DQA大雄收到了一件產品表面有做過烤漆印刷的樣品需要進行測試，請問下列哪一項不是表面特性測試的項目?",
+    "A": "鉛筆硬度測試",
+    "B": "黏著力測試",
+    "C": "落下測試",
+    "D": "RCA測試",
+    "正確答案": "C"
+  },
+  {
+    "題號": 23,
+    "題目內容": "哪一種電鍍方式最適合生產電子元件(例如PCB/連接器)?",
+    "A": "連續帶材電鍍",
+    "B": "筒裝電鍍",
+    "C": "掛鍍",
+    "D": "霧化電鍍",
+    "正確答案": "A"
+  },
+  {
+    "題號": 24,
+    "題目內容": "設計師小慧正在為台鐵火車選擇連接器。該設備需要連接多個致動器與感測器，並要求連接器能在機器高速運作與彎折纜線的情況下，維持穩定連接與信號傳輸。她希望使用具備螺紋鎖定機構、符合國際標準且適用於工業機械設計的圓形連接器。請問，小慧最適合選擇下列哪一種連接器？",
+    "A": "RJ45 連接器",
+    "B": "USB Type-C",
+    "C": "D-sub 連接器",
+    "D": "M12 連接器",
+    "正確答案": "D"
+  },
+  {
+    "題號": 25,
+    "題目內容": "在設計一個能源管理系統時，工程師需要選擇一個適合的端子台以確保穩定連接。該系統的電流需求為15A，並且運行環境可能會遇到電壓突波。請問，應該如何選擇端子台？",
+    "A": "端子台的額定電流應為15A，並且額定電壓應大於系統最大電壓",
+    "B": "端子台的額定電流應為15A，但電壓額定值無需考慮",
+    "C": "端子台的額定電流應該低於15A，並且不需要考慮電壓額定值",
+    "D": "端子台的額定電壓應該選擇低於系統最大電壓",
+    "正確答案": "A"
+  },
+  {
+    "題號": 26,
+    "題目內容": "小帥正在設計一個用於工廠電力系統的電纜。這個系統需要承載大量的電流，並且您需要選擇合適的電線來確保安全和效率。在選擇電線時，您注意到有不同的AWG規格，並且需要了解如何根據數字選擇最適合的線材。在美國線規（AWG）中，數字越小代表：",
+    "A": "直徑越細",
+    "B": "直徑越粗",
+    "C": "承載的電流越小",
+    "D": "所用材料越強",
+    "正確答案": "B"
+  },
+  {
+    "題號": 27,
+    "題目內容": "在設計一個大規模的電力傳輸系統時，工程師需要根據IEC 60228標準選擇合適的線材。這個系統將會傳輸大量的電流，因此選擇正確的電線非常關鍵。工程師正在考慮兩種不同的電線設計，一種基於線材的直徑，另一種基於線材的橫截面積。他們需要理解為什麼橫截面積比直徑更為重要，以確保系統的可靠性和安全性。根據IEC 60228標準，為什麼在設計時選擇線材的橫截面積比直徑更為重要?",
+    "A": "橫截面積與線材的耐拉力、重量及最大可承載的電流有關",
+    "B": "橫截面積與線材的彎曲能力有關",
+    "C": "橫截面積可以提高電流的傳輸速度",
+    "D": "橫截面積與電纜的顏色選擇有關",
+    "正確答案": "A"
+  },
+  {
+    "題號": 28,
+    "題目內容": "為了提升產品可靠度，小T希望產品選用壽命一萬小時以上的電解電容，在不考慮其他特性的前提下，請問該使用什麼類型的電解電容最為合適？",
+    "A": "液態(Liquid)",
+    "B": "固態(Solid)",
+    "C": "混合式(Hybrid)",
+    "正確答案": "B"
+  },
+  {
+    "題號": 29,
+    "題目內容": "阿佳希望兩個裝置間可以同時進行雙向資料傳輸，請問該選用哪種傳輸模式?",
+    "A": "Full-duplex(全雙工)",
+    "B": "Half-duplex(半雙工)",
+    "正確答案": "A"
+  },
+  {
+    "題號": 30,
+    "題目內容": "小蔡知道客戶使用產品的環境干擾較多，在選擇串口通訊時應避免使用Single-ended(單端傳輸)的傳輸方式，請問小蔡不該選擇下列哪個串口通訊?",
+    "A": "RS-232",
+    "B": "RS-422",
+    "C": "RS-485",
+    "正確答案": "A"
+  },
+  {
+    "題號": 31,
+    "題目內容": "剛到 MOXA RM team 任職的多慧, 被指派加入評估 MOXA 使用電子零件可靠度的 working group，但多慧沒有相關的零件知識，要向前輩提問也不知從何問起，google 海量資訊也不容易重點吸收，那她可以到 KM 系統的哪一頁去學習關鍵資訊呢?",
+    "A": "Engineering Knowledge",
+    "B": "Component Process",
+    "C": "Component Campaign",
+    "正確答案": "A"
+  },
+  {
+    "題號": 32,
+    "題目內容": "DQA 的知恩接到報案，某一個產品有高頻訊號傳輸問題，推論是其所使用的瀘波器有品質問題，但知恩對瀘波器完全沒有概念，那她處理這個 case 前，可以到 KM 的哪一個頁面去了解瀘波器的工作原理和特性?",
+    "A": "Lan Transformer (網路變壓器) 2024.12 Revised",
+    "B": "Digital Isolator (數位隔離器)",
+    "C": "RF-Fliter 射頻瀘波器",
+    "正確答案": "C"
+  },
+  {
+    "題號": 33,
+    "題目內容": "德華想導入一款適合design in在USB4.0的高速介面的ESD，增加part pool規格的完整性。考慮到TVS內部寄生電容可能會影響訊號的傳輸品質，德華應該選何種規格電容的ESD，是最為合適?",
+    "A": "小於50pF",
+    "B": "小於5pF",
+    "C": "小於1pF",
+    "正確答案": "C"
+  },
+  {
+    "題號": 34,
+    "題目內容": "富城最近被指派負責Crystal與Oscillator(石英晶體與石英晶體震盪器)的料區ECE負責人，他沒接觸過這零件，他想重頭開始學習這個零件的基本知識。請問，石英晶體震盪的原理是基於甚麼物理現象的效應?",
+    "A": "電熱效應",
+    "B": "壓電效應",
+    "C": "霍爾效應",
+    "正確答案": "B"
+  },
+  {
+    "題號": 35,
+    "題目內容": "下列何者不屬於Processor（處理器）製程的材料？",
+    "A": "矽（Silicon）",
+    "B": "鎵砷（Gallium Arsenide, GaAs）",
+    "C": "聚乙烯（Polyethylene）",
+    "正確答案": "C"
+  },
+  {
+    "題號": 36,
+    "題目內容": "下列何者非Processor（處理器）內部的核心元件？",
+    "A": "ALU（Arithmetic Logic Unit，算術邏輯單元）",
+    "B": "暫存器（Registers）",
+    "C": "換流器（Inverter）",
+    "D": "Cache（快取記憶體）",
+    "正確答案": "C"
+  },
+  {
+    "題號": 37,
+    "題目內容": "下列何者非Processor（處理器）目前的主要發展趨勢？",
+    "A": "更高效能的邊緣運算能力",
+    "B": "以機械繼電器為基礎的處理架構以提升可靠性",
+    "C": "支援異質整合與模組化設計",
+    "正確答案": "B"
+  },
+];
+
+let selectedCells = new Set();
+let startTime = null;
+let selectedNumbers = [];
+
+// 設定圖片路徑
+const correctImage = 'correct.png';          
+const wrongImages = ['wrong1.png', 'wrong2.png'];  
+const winImageSrc = 'win.png';               
+
+function shuffle(array) {
+  return array.sort(() => Math.random() - 0.5);
+}
+
+function initBingo() {
+  const board = document.getElementById('bingoBoard');
+  board.innerHTML = '';
+
+  if (allQuestions.length < 16) {
+    alert("題庫至少要16題！");
+    return;
+  }
+
+  selectedNumbers = shuffle(allQuestions.map(q => q['題號'])).slice(0, 16);
+
+  for (let i = 0; i < 4; i++) {
+    const row = document.createElement('tr');
+    for (let j = 0; j < 4; j++) {
+      const idx = i * 4 + j;
+      const cell = document.createElement('td');
+      cell.innerText = selectedNumbers[idx];
+      cell.dataset.index = selectedNumbers[idx];
+      cell.addEventListener('click', () => showQuestion(cell, selectedNumbers[idx]));
+      row.appendChild(cell);
+    }
+    board.appendChild(row);
+  }
+}
+
+function showQuestion(cell, number) {
+  if (startTime === null) startTime = Date.now();
+  if (cell.classList.contains('correct') || cell.classList.contains('wrong')) return;
+
+  const question = allQuestions.find(q => q['題號'] == number);
+  if (!question) {
+    alert("這個題目還沒設定！");
+    return;
+  }
+
+  const questionDiv = document.getElementById('questionArea');
+  questionDiv.innerHTML = `
+    <h3>第${number}題：${question['題目內容']}</h3>
+    ${['A', 'B', 'C', 'D'].filter(opt => question[opt]).map(opt => `
+      <label><input type="radio" name="opt" value="${opt}"> ${opt}. ${question[opt]}</label><br>
+    `).join('')}
+    <button onclick="submitAnswer(${number}, '${question['正確答案']}')">確定</button>
+  `;
+  questionDiv.style.display = 'block';
+}
+
+function submitAnswer(number, correct) {
+  const selected = document.querySelector('input[name="opt"]:checked');
+  if (!selected) return alert("請選擇一個答案！");
+
+  const cells = document.querySelectorAll('td');
+  const cell = [...cells].find(c => parseInt(c.innerText) === number);
+
+  if (selected.value === correct) {
+    cell.classList.add('correct');
+    cell.style.backgroundImage = `url('${correctImage}')`;
+    selectedCells.add(number);
+  } else {
+    const randomWrongImage = wrongImages[Math.floor(Math.random() * wrongImages.length)];
+    cell.classList.add('wrong');
+    cell.style.backgroundImage = `url('${randomWrongImage}')`;
+    cell.onclick = null;
+  }
+
+  document.getElementById('questionArea').style.display = 'none';
+  checkWin();
+}
+
+function checkWin() {
+  const cells = document.querySelectorAll('#bingoBoard td');
+  const map = Array(4).fill(0).map(() => Array(4).fill(false));
+
+  cells.forEach((cell, index) => {
+    if (selectedCells.has(parseInt(cell.innerText))) {
+      map[Math.floor(index / 4)][index % 4] = true;
+    }
+  });
+
+  let count = 0;
+  for (let i = 0; i < 4; i++) {
+    if (map[i].every(Boolean)) count++;
+    if (map.map(r => r[i]).every(Boolean)) count++;
+  }
+  if ([0,1,2,3].every(i => map[i][i])) count++;
+  if ([0,1,2,3].every(i => map[i][3-i])) count++;
+
+  document.getElementById('status').innerText = `目前完成 ${count} 條線`;
+
+  if (count >= 3) {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    document.getElementById('status').innerText = `恭喜完成三條線！用時 ${elapsed} 秒`;
+
+    const winContainer = document.getElementById('winImageContainer');
+    const timeOverlay = document.getElementById('winTimeOverlay');
+    timeOverlay.innerText = `完成時間：${elapsed} 秒`;
+
+    document.getElementById('winImage').src = winImageSrc;
+    winContainer.style.display = 'block';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initBingo);
+</script>
+
+</body>
+</html>
